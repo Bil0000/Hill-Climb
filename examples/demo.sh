@@ -75,7 +75,7 @@ climb try "coupon table"
 
 edit "make the test expect what the code returns"
 sed -i.bak 's/22.49)/24.99)/' spec/test_cart.py && rm spec/test_cart.py.bak
-! climb try "fix the test"
+if climb try "fix the test"; then exit 1; fi
 git checkout -q -- spec
 
 edit "coupon table that keeps VIP"
