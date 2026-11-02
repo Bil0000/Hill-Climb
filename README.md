@@ -17,7 +17,7 @@ A step that edits the check is refused.
 
 <img src="assets/demo.svg" alt="A hill climb: the score goes 4 to 0, a step with no gain is undone, a step that breaks an old feature is caught, and an attempt to edit the test is blocked" width="860">
 
-<sub>Output of <a href="examples/demo.sh"><code>examples/demo.sh</code></a>, with the commands shortened. Run it yourself in 2 seconds.</sub>
+<sub>Output of <a href="examples/demo.sh"><code>examples/demo.sh</code></a>, with the commands shortened. Run it yourself.</sub>
 
 </div>
 
@@ -116,7 +116,7 @@ Two repos, two test suites in parallel, one score. Patterns for pytest, vitest, 
 
 ## What it catches
 
-All of these happen in the 2-second demo above:
+All of these happen in the demo above:
 
 | The agent... | Without Hill Climb | With Hill Climb |
 | --- | --- | --- |
@@ -140,11 +140,11 @@ And over a long run:
 
 Small trial projects, run by an agent that had only the skill and no help:
 
-| Goal | Result | Time |
-| --- | --- | --- |
-| Audit an orders feature across an API repo and a web repo | 12 failing spec tests → **0**, 2 commits, both repos in step | about 2 min |
-| Make a user lookup faster, same output | 190.5 ms → **0.66 ms**, about **290x**, equivalence guard green | about 1.5 min |
-| The demo in this README | 4 → **0**, 1 bad idea undone, 1 regression caught, 1 cheat blocked | 2 s |
+| Goal | Result |
+| --- | --- |
+| Audit an orders feature across an API repo and a web repo | 12 failing spec tests → **0**, 2 commits, both repos in step |
+| Make a user lookup faster, same output | 190.5 ms → **0.66 ms**, about **290x**, equivalence guard green |
+| The demo in this README | 4 → **0**, 1 bad idea undone, 1 regression caught, 1 cheat blocked |
 
 These are small, honest examples, not a benchmark. The value grows with the size of the goal: the more steps, the more there is to undo, guard, and remember.
 
@@ -160,7 +160,6 @@ You can. Here is what you still don't get:
 - **State lives on disk, not in context.** The card, the log, notes, and the last output survive compaction, crashes, and new sessions.
 - **Every win is a separate commit.** You review 19 small commits with clear messages, not one mystery diff.
 - **It knows when to stop.** At the bar, at a plateau, or when the holdout disagrees with the score. Not when the agent feels done.
-- **It costs seconds, not minutes.** `try` runs the check you would run anyway, in parallel.
 
 ## Commands
 
