@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="546" viewBox="0 0 900 546" role="img" aria-label="A hill climb run: score 4 to 0, a bad step undone, a broken guard caught, a cheat blocked">
+<style>
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;white-space:pre;opacity:0;animation:show 11.7s infinite}
+@keyframes show{0%{opacity:0}2%{opacity:1}92%{opacity:1}97%{opacity:0}100%{opacity:0}}
+</style>
+<rect width="900" height="546" rx="10" fill="#0d1117"/>
+<rect width="900" height="32" rx="10" fill="#161b22"/><rect y="22" width="900" height="10" fill="#161b22"/>
+<circle cx="20" cy="16" r="6" fill="#f85149"/><circle cx="40" cy="16" r="6" fill="#d29922"/><circle cx="60" cy="16" r="6" fill="#3fb950"/>
+<text x="450" y="21" fill="#8b949e" text-anchor="middle" style="opacity:1;animation:none">examples/demo.sh</text>
+<text x="22" y="56" fill="#e6edf3" font-weight="700" style="animation-delay:0.00s">$ /hill-climb fix every cart finding in the audit</text>
+<text x="22" y="77" fill="#6e7681" style="animation-delay:0.35s">  agent writes 4 failing tests, one per finding, then:</text>
+<text x="22" y="98" fill="#e6edf3" font-weight="700" style="animation-delay:0.70s">$ climb.py init cart-audit --check &quot;unittest spec&quot; --target 0 --guard &quot;unittest test_old&quot; --lock spec</text>
+<text x="22" y="119" fill="#8b949e" style="animation-delay:1.05s">Baseline 4 (min). Bar 0, then stop.</text>
+<text x="22" y="140" fill="#000" style="animation-delay:1.40s"></text>
+<text x="22" y="161" fill="#e6edf3" font-weight="700" style="animation-delay:1.75s">$ climb.py try &quot;start the sum at zero&quot;</text>
+<text x="22" y="182" fill="#3fb950" style="animation-delay:2.10s">step 1 kept    3 (was 4, start 4)</text>
+<text x="22" y="203" fill="#e6edf3" font-weight="700" style="animation-delay:2.45s">$ climb.py try &quot;round every total to whole numbers&quot;</text>
+<text x="22" y="224" fill="#f85149" style="animation-delay:2.80s">step 2 undone  3 (best 3)<tspan fill="#d29922" font-weight="400">   ← no gain, so the tree is reset</tspan></text>
+<text x="22" y="245" fill="#e6edf3" font-weight="700" style="animation-delay:3.15s">$ climb.py try &quot;coupon table&quot;</text>
+<text x="22" y="266" fill="#f85149" style="animation-delay:3.50s">step 3 undone  1 but guard failed: unittest test_old</text>
+<text x="22" y="287" fill="#6e7681" style="animation-delay:3.85s">  AssertionError: 30 != 15<tspan fill="#d29922" font-weight="400">   ← the old VIP discount broke</tspan></text>
+<text x="22" y="308" fill="#e6edf3" font-weight="700" style="animation-delay:4.20s">$ climb.py try &quot;fix the test&quot;</text>
+<text x="22" y="329" fill="#f85149" style="animation-delay:4.55s">Locked files changed. Undo those edits.<tspan fill="#d29922" font-weight="400">   ← no cheating</tspan></text>
+<text x="22" y="350" fill="#e6edf3" font-weight="700" style="animation-delay:4.90s">$ climb.py try &quot;coupon table, VIP kept&quot;</text>
+<text x="22" y="371" fill="#3fb950" style="animation-delay:5.25s">step 4 kept    1 (was 3, start 4)</text>
+<text x="22" y="392" fill="#e6edf3" font-weight="700" style="animation-delay:5.60s">$ climb.py try &quot;TAKE100, floor at zero&quot;</text>
+<text x="22" y="413" fill="#3fb950" style="animation-delay:5.95s">step 5 kept    0 (was 1, start 4)</text>
+<text x="22" y="434" fill="#d29922" font-weight="700" style="animation-delay:6.30s">BAR REACHED: 0 meets 0.</text>
+<text x="22" y="455" fill="#000" style="animation-delay:6.65s"></text>
+<text x="22" y="476" fill="#e6edf3" font-weight="700" style="animation-delay:7.00s">$ climb.py status</text>
+<text x="22" y="497" fill="#8b949e" style="animation-delay:7.35s">Score 4 -&gt; 0 (min)  ▁▃▆█    Steps 5, kept 3</text>
+</svg>

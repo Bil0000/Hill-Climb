@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "hill-climb",
+  "description": "Goal-driven loops for coding agents, scored by a check the agent can't fool.",
+  "owner": { "name": "Bil0000", "url": "https://github.com/Bil0000" },
+  "plugins": [
+    {
+      "name": "hill-climb",
+      "description": "Reach any goal a command can score, in small checked steps, across one or many repos.",
+      "source": "./",
+      "category": "development",
+      "tags": ["agents", "loop", "tests", "performance", "audit"]
+    }
+  ]
+}
