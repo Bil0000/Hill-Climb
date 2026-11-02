@@ -48,7 +48,7 @@ class Findings(unittest.TestCase):
 PY
 
 say() { printf '\n\033[1m$ %s\033[0m\n' "$*"; }
-climb() { say "climb.py $*"; python3 "$CLIMB" "$@" || true; }
+climb() { say "climb.py $*"; python3 "$CLIMB" "$@"; }
 edit() { printf '\n\033[2m# agent: %s\033[0m\n' "$*"; }
 
 climb init cart-audit --goal "fix every cart finding" \
@@ -75,7 +75,7 @@ climb try "coupon table"
 
 edit "make the test expect what the code returns"
 sed -i.bak 's/22.49)/24.99)/' spec/test_cart.py && rm spec/test_cart.py.bak
-climb try "fix the test"
+! climb try "fix the test"
 git checkout -q -- spec
 
 edit "coupon table that keeps VIP"
@@ -101,4 +101,5 @@ PY
 climb try "TAKE100, floor at zero"
 
 climb status
+python3 "$CLIMB" status | grep -q "Score 4 -> 0"
 git log --oneline

@@ -6,7 +6,7 @@
 
 Give the agent a goal and a command that scores it. The agent works in small steps.
 Every step that improves the score is committed. Every other step is undone.
-The agent can't edit the check to win.
+A step that edits the check is refused.
 
 [![tests](https://github.com/Bil0000/Hill-Climb/actions/workflows/test.yml/badge.svg)](https://github.com/Bil0000/Hill-Climb/actions/workflows/test.yml)
 ![python](https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square)
@@ -64,8 +64,8 @@ The branch only ever holds proven steps. One commit per win, with the idea as th
 
 ```bash
 git clone https://github.com/Bil0000/Hill-Climb.git
-cp -R Hill-Climb/skills/hill-climb ~/.claude/skills/    # Claude Code
-cp -R Hill-Climb/skills/hill-climb ~/.codex/skills/     # Codex
+mkdir -p ~/.claude/skills && cp -R Hill-Climb/skills/hill-climb ~/.claude/skills/   # Claude Code
+mkdir -p ~/.codex/skills && cp -R Hill-Climb/skills/hill-climb ~/.codex/skills/     # Codex
 ```
 
 Then just ask:
@@ -76,7 +76,9 @@ Then just ask:
 /hill-climb keep going until every test passes
 ```
 
-The agent builds the check, shows you a one-screen plan (the "card"), and climbs after you say **go**.
+With the plugin install, the command is `/hill-climb:hill-climb`. In Codex, name the skill in your prompt.
+
+The agent builds the check and climbs. For a big goal, it first shows you a one-screen plan (the "card") and waits for you to say **go**. A small goal starts at once.
 
 Needs Python 3.9+ and git. Nothing else. No packages, no server, no account.
 
@@ -143,8 +145,8 @@ And over a long run:
 
 | | Without | With |
 | --- | --- | --- |
-| Context compacted, session crashed | Starts over, repeats ideas | `climb.py status` shows score, trail, notes, last output |
-| Noisy benchmark | A lucky run counts as a win | `--runs 3 --paired --min-gain 3%`: luck can't win |
+| Context compacted, session crashed | Starts over, repeats ideas | `climb.py status` shows the score, trail, and notes. `last.txt` holds the check output |
+| Noisy benchmark | A lucky run counts as a win | `--runs 3 --paired --min-gain 3%` cut lucky wins |
 | Overfitting to the test cases | Invisible | A holdout check the agent never sees |
 | Stuck | Keeps trying the same thing | `PLATEAU` after 5 flat steps, forces a blocker review |
 | "Is it done?" | The agent's opinion | `BAR REACHED: 0 meets 0` |
@@ -169,7 +171,7 @@ These are small, honest examples, not a benchmark. The value grows with the size
 You can. Here is what you still don't get:
 
 - **Undo is automatic and complete.** A step that doesn't win is reset in every repo, including new files. Nothing half-done is left behind.
-- **The check is locked.** The script hashes the test files. An agent under pressure to pass can't weaken them, even by accident.
+- **The check is locked.** The script hashes the test files and refuses to score a step that changed them. A weakened test can't sneak in as a win.
 - **Guards protect what you didn't ask about.** The score only measures the goal. Guards make sure the rest still works.
 - **State lives on disk, not in context.** The card, the log, notes, and the last output survive compaction, crashes, and new sessions.
 - **Every win is a separate commit.** You review 19 small commits with clear messages, not one mystery diff.
@@ -185,7 +187,7 @@ You can. Here is what you still don't get:
 | `status` | Score, trail, last steps, PLATEAU or STUCK |
 | `relock --why "..."` | Accept a changed check (a new finding, a better test) |
 | `holdout --why "..."` | Run the hidden cases |
-| `raise <bar>` | Set a harder bar after reaching this one |
+| `raise <bar> --why "..."` | Set a harder bar after reaching this one |
 | `review "<found>"` | Log a blocker review |
 | `budget`, `drop`, `list`, `save`, `kits`, `reuse` | Limits, start over, and reusable check kits |
 
@@ -198,7 +200,8 @@ The full guide for the agent is [`skills/hill-climb/SKILL.md`](skills/hill-climb
 - A climb runs on its own branch, `climb/<name>`. Your branch is not touched.
 - An undo resets the climb branch and deletes untracked files that git does not ignore. If you work in the same checkout at the same time, run the climb in a separate worktree.
 - `drop` goes back to your branch and keeps the old climb on a renamed branch.
-- No file over 10 MB is ever committed.
+- `init` and `try` refuse to commit a file over 10 MB.
+- The lock catches mistakes, not a determined cheat. An agent with a shell can edit anything, so review the branch before you merge it.
 - Locks hash every file name, but not the content of files git ignores, so caches like `.pyc` don't trip them. Don't lock data that git ignores. Put it under `.hill-climb/<name>/`, where content is always hashed.
 - `judge.py` tells each judge to ignore instructions inside the work it scores. A model judge can still be fooled. Prefer an exact check when one exists.
 - Climb only repos you trust. The check and the guards are shell commands, and the climb state in `.hill-climb/` is read as-is.

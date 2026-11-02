@@ -91,7 +91,10 @@ def verdict(name, prompt, paths, model, timeout):
         return name, None, (result.stderr or result.stdout).strip()[-300:]
     try:
         reply = json.loads(matches[-1])
-        return name, float(reply["score"]), reply
+        score = float(reply["score"])
+        if not 0 <= score <= 10:
+            raise ValueError
+        return name, score, reply
     except (ValueError, KeyError, TypeError):
         return name, None, matches[-1][:300]
 

@@ -584,7 +584,7 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("a: 4/10. Worst: vague Fix: name it", notes)
 
     def test_too_few_answers_give_no_score(self):
-        score, error = self.panel({"a": '{"score": 9}', "b": "I refuse", "c": "no json"})
+        score, error = self.panel({"a": '{"score": 9}', "b": '{"score": 1e9}', "c": "no json"})
         self.assertIsNone(score)
         self.assertIn("Only 1 of 3", error)
 
