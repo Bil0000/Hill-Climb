@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-label="How Hill Climb works: you give a goal, the agent writes a check that prints a number, climb.py init takes a baseline and locks the check. Then a loop: the agent makes one small change, climb.py try runs the check and guards, a better score with passing guards is committed, anything else is undone. The loop ends at the bar or when gains stop, with a report of measured numbers.">
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;fill:#e6edf3;text-anchor:middle}
+.m{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.s{font-size:12px;fill:#8b949e}
+.box{fill:#161b22;stroke:#30363d;stroke-width:1.5}
+.line{fill:none;stroke:#6e7681;stroke-width:1.5}
+</style>
+<defs>
+<marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6e7681"/></marker>
+<marker id="g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#3fb950"/></marker>
+<marker id="r" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f85149"/></marker>
+</defs>
+<rect width="900" height="500" rx="10" fill="#0d1117"/>
+<rect width="900" height="32" rx="10" fill="#161b22"/><rect y="22" width="900" height="10" fill="#161b22"/>
+<circle cx="20" cy="16" r="6" fill="#f85149"/><circle cx="40" cy="16" r="6" fill="#d29922"/><circle cx="60" cy="16" r="6" fill="#3fb950"/>
+<text x="450" y="21" class="m" style="fill:#8b949e">how it works</text>
+
+<rect x="330" y="48" width="240" height="34" rx="17" class="box"/>
+<text x="450" y="70"><tspan fill="#8b949e">you:</tspan> "make X better"</text>
+<path d="M450 82V103" class="line" marker-end="url(#a)"/>
+
+<rect x="250" y="108" width="400" height="56" rx="10" class="box"/>
+<text x="450" y="131">agent writes a check that prints a number</text>
+<text x="450" y="152" class="m"><tspan fill="#58a6ff">climb.py init</tspan><tspan fill="#8b949e">   baseline · branch · lock</tspan></text>
+<path d="M450 164V222" class="line"/>
+<circle cx="450" cy="222" r="3" fill="#6e7681"/>
+
+<rect x="36" y="194" width="828" height="210" rx="14" fill="none" stroke="#30363d" stroke-dasharray="4 4"/>
+<text x="52" y="214" class="s" style="text-anchor:start;font-size:10px;letter-spacing:1px">THE LOOP</text>
+
+<path d="M798 240V222H156V271" fill="none" stroke="#3fb950" stroke-width="1.5" marker-end="url(#g)"/>
+<text x="624" y="215" class="s" style="fill:#3fb950">kept: one commit, the new best</text>
+<path d="M798 360V382H156V329" fill="none" stroke="#f85149" stroke-width="1.5" marker-end="url(#r)"/>
+<text x="476" y="398" class="s" style="fill:#f85149">undone: tree reset in every repo, nothing lands</text>
+
+<path d="M256 300H288" class="line" marker-end="url(#a)"/>
+<path d="M492 300H524" class="line" marker-end="url(#a)"/>
+<path d="M698 300H722V260H742" fill="none" stroke="#3fb950" stroke-width="1.5" marker-end="url(#g)"/>
+<path d="M722 300V340H742" fill="none" stroke="#f85149" stroke-width="1.5" marker-end="url(#r)"/>
+
+<circle r="4" fill="#d29922">
+<animateMotion dur="9s" repeatCount="indefinite" path="M156 300H722V260H798V222H156V300H722V340H798V382H156V300"/>
+</circle>
+
+<rect x="56" y="275" width="200" height="50" rx="10" class="box"/>
+<text x="156" y="296">agent makes one</text>
+<text x="156" y="314">small change</text>
+
+<rect x="292" y="275" width="200" height="50" rx="10" class="box"/>
+<text x="392" y="296" class="m" style="fill:#58a6ff">climb.py try "idea"</text>
+<text x="392" y="314" class="s">runs the check + guards</text>
+
+<rect x="528" y="275" width="170" height="50" rx="10" fill="#1f1a10" stroke="#d29922" stroke-width="1.5"/>
+<text x="613" y="296">better score</text>
+<text x="613" y="314">and guards pass?</text>
+
+<rect x="746" y="240" width="104" height="40" rx="10" fill="#10241a" stroke="#3fb950" stroke-width="1.5"/>
+<text x="798" y="265"><tspan fill="#8b949e">yes:</tspan> <tspan fill="#3fb950" font-weight="700">commit</tspan></text>
+<rect x="746" y="320" width="104" height="40" rx="10" fill="#2a1416" stroke="#f85149" stroke-width="1.5"/>
+<text x="798" y="345"><tspan fill="#8b949e">no:</tspan> <tspan fill="#f85149" font-weight="700">undo</tspan></text>
+
+<path d="M300 404V427" class="line" marker-end="url(#a)"/>
+<rect x="150" y="432" width="300" height="40" rx="10" class="box"/>
+<text x="300" y="457">bar reached, or no more gains</text>
+<path d="M450 452H485" class="line" marker-end="url(#a)"/>
+<rect x="490" y="432" width="260" height="40" rx="10" fill="#0f1b2d" stroke="#58a6ff" stroke-width="1.5"/>
+<text x="620" y="457">report with measured numbers</text>
+</svg>

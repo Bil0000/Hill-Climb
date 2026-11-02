@@ -84,23 +84,7 @@ Needs Python 3.9+ and git. Nothing else. No packages, no server, no account.
 
 ## How it works
 
-```
- you: "make X better"
-        │
-        ▼
- agent writes a check that prints a number ──► climb.py init   (baseline, branch, lock)
-        │
-        ▼
- ┌─► agent makes one small change
- │      │
- │      ▼
- │   climb.py try "idea" ──► score better and guards pass? ── yes ──► commit
- │      │                                                      no ──► undo
- └──────┘
-        │
-        ▼
- bar reached, or no more gains ──► report with measured numbers
-```
+<img src="assets/how-it-works.svg" alt="How Hill Climb works: the agent writes a check that prints a number, climb.py init locks it, then each small change goes through climb.py try. A better score with passing guards is committed. Anything else is undone. It stops at the bar or when gains stop, with a report of measured numbers." width="860">
 
 The agent never writes a score itself. It never decides that a step "basically" passed. The script measures, and the log on disk is the truth.
 
