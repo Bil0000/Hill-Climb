@@ -6,6 +6,7 @@ commits kept steps, and writes the log. The model never grades itself.
 """
 
 import argparse
+import fcntl
 import hashlib
 import io
 import json
@@ -342,6 +343,16 @@ def exclude_state(path=None):
         exclude.write_text(text + ("" if text.endswith("\n") or not text else "\n") + "/.hill-climb/\n")
 
 
+def hold_lock():
+    handle = open(git("rev-parse", "--git-path", "hill-climb.lock"), "a")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        raise Fail("Another climb.py command is still running in this checkout. Wait for it to finish. "
+                   "A command you interrupted can still be running.")
+    return handle
+
+
 def kits_dir():
     return Path(os.environ.get("HILL_CLIMB_HOME") or Path.home() / ".hill-climb") / "kits"
 
@@ -536,9 +547,10 @@ def cmd_init(args):
             f"--min-gain {max(1, round(percent * 1.5))}% keeps working as the score shrinks. "
             f"If the machine's load changes the score, add --paired."
         )
-    if args.score and args.direction == "min" and not args.guard:
-        print("Warning: no guard. A crash that stops the tests can print fewer failures and win. "
-              "Add --guard with the tests that pass today, or a build or typecheck.")
+    if not args.guard:
+        risk = ("A crash that stops the tests can print fewer failures and win." if args.score and args.direction == "min"
+                else "A kept step can break anything the check does not measure.")
+        print(f"Warning: no guard. {risk} Add --guard with the tests that pass today, or a build or typecheck.")
     if target is not None:
         print(f"Bar {number(target)}, then {args.after}.")
     if target is not None and reached(card, score):
@@ -886,12 +898,14 @@ def parse(argv):
     bump.add_argument("--name")
 
     relock = sub.add_parser("relock", help="accept a fixed check and measure again")
+    relock.add_argument("name", nargs="?", default=argparse.SUPPRESS)
     relock.add_argument("--why", required=True)
     relock.add_argument("--name")
 
     budget = sub.add_parser("budget", help="give more hours or steps, or remove the limits")
     budget.add_argument("--hours", type=float, help="hours from now")
     budget.add_argument("--steps", type=int, help="steps from now")
+    budget.add_argument("name", nargs="?", default=argparse.SUPPRESS)
     budget.add_argument("--off", action="store_true", help="remove both limits")
     budget.add_argument("--name")
 
@@ -922,6 +936,7 @@ def main(argv=None):
         home = Path(".hill-climb/home")
         if args.command != "init" and home.is_file() and not list(climbs_dir().glob("*/card.json")):
             os.chdir(home.read_text().strip())
+        held = None if args.command in ("status", "list", "kits") else hold_lock()
     except Fail as error:
         print(error, file=sys.stderr)
         return 1

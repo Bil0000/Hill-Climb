@@ -1,3 +1,4 @@
+import fcntl
 import importlib.util
 import io
 import json
@@ -66,7 +67,9 @@ class ClimbTest(unittest.TestCase):
         return json.loads(Path(".hill-climb/speed/card.json").read_text())
 
     def test_keeps_gains_and_undoes_losses(self):
-        self.assertIn("Baseline 3", self.start())
+        output = self.start()
+        self.assertIn("Baseline 3", output)
+        self.assertIn("no guard", output)
         self.assertEqual(subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(), "climb/speed")
 
         Path("value.txt").write_text("5\n")
@@ -94,7 +97,7 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("drop to four", output)
 
     def test_guard_failure_undoes_a_gain(self):
-        self.start("--guard", "grep -qv 7 value.txt")
+        self.assertNotIn("no guard", self.start("--guard", "grep -qv 7 value.txt"))
         Path("value.txt").write_text("7\n")
         code, output = self.run_climb("try", "seven breaks the guard")
         self.assertIn("guard failed", output)
@@ -113,7 +116,13 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("value.txt", output)
 
         git("checkout", "value.txt")
-        code, output = self.run_climb("relock", "--why", "the old check read the wrong file")
+        with open(climb.git("rev-parse", "--git-path", "hill-climb.lock"), "a") as held:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            code, output = self.run_climb("relock", "speed", "--why", "an interrupted relock still runs")
+            self.assertEqual(code, 1)
+            self.assertIn("still running", output)
+            self.assertEqual(self.run_climb("status")[0], 0)
+        code, output = self.run_climb("relock", "speed", "--why", "the old check read the wrong file")
         self.assertEqual(code, 0, output)
         self.assertEqual(self.card()["best"]["score"], 100)
 
@@ -338,7 +347,7 @@ class ClimbTest(unittest.TestCase):
         code, output = self.run_climb("try", "over budget")
         self.assertEqual(code, 1)
         self.assertIn("Budget used", output)
-        self.assertIn("Budget now 3 steps", self.run_climb("budget", "--steps", "2")[1])
+        self.assertIn("Budget now 3 steps", self.run_climb("budget", "speed", "--steps", "2")[1])
         self.assertIn("kept", self.run_climb("try", "two more steps")[1])
         Path("value.txt").write_text("6\n")
         self.run_climb("try", "last step inside the limit")

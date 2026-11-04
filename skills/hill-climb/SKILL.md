@@ -346,7 +346,9 @@ Each step is one idea, one change, one `try`:
    it there instead of running the check again.
 4. While a long check runs, don't edit the tree. Read code and plan the next
    step. Run `try` in the background if the harness allows it, and wait for
-   its finish notice, not a sleep loop.
+   its finish notice, not a sleep loop. Only one command that changes the
+   climb runs at a time. If one says another is still running, wait for it:
+   an interrupted command can still be running.
 5. Every 5 steps, update `.hill-climb/<name>/notes.md` in a few lines: what
    works, what doesn't, what to try next. A new session resumes from it.
 
@@ -512,9 +514,9 @@ mid-climb, the next one starts at step 0.
 | `status [name]` | Score, trail, last steps, PLATEAU or STUCK |
 | `holdout --why "..."` | Run the holdout now |
 | `raise <bar> --why "..."` | Set a harder bar after reaching this one |
-| `relock --why "..."` | Accept a fixed check and measure again |
+| `relock [name] --why "..."` | Accept a fixed check and measure again |
 | `review "<found>"` | Log a blocker review |
-| `budget [--hours N] [--steps N] [--off]` | Give N more hours or steps from now, or remove the limits |
+| `budget [name] [--hours N] [--steps N] [--off]` | Give N more hours or steps from now, or remove the limits |
 | `drop [name]` | Abandon the climb, keep its branch |
 | `list` | Climbs in this repo |
 | `save [name]` | Save the kit now |
