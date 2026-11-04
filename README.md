@@ -168,7 +168,7 @@ You can. Here is what you still don't get:
 | `init <name> --goal --check --direction min\|max` | Baseline, branch, lock, kit |
 | `try "<idea>" [--fix]` | Score the change, keep or undo it |
 | `status` | Score, trail, last steps, PLATEAU or STUCK |
-| `relock --why "..."` | Accept a changed check (a new finding, a better test) |
+| `relock [name] --why "..."` | Accept a changed check (a new finding, a better test) |
 | `holdout --why "..."` | Run the hidden cases |
 | `raise <bar> --why "..."` | Set a harder bar after reaching this one |
 | `review "<found>"` | Log a blocker review |
@@ -183,6 +183,7 @@ The full guide for the agent is [`skills/hill-climb/SKILL.md`](skills/hill-climb
 - A climb runs on its own branch, `climb/<name>`. Your branch is not touched.
 - An undo resets the climb branch and deletes untracked files that git does not ignore. If you work in the same checkout at the same time, run the climb in a separate worktree.
 - `drop` goes back to your branch and keeps the old climb on a renamed branch.
+- Only one command that changes a climb runs at a time in a checkout. An interrupted command that is still running blocks the next one, so two runs never score at once.
 - `init` and `try` refuse to commit a file over 10 MB.
 - The lock catches mistakes, not a determined cheat. An agent with a shell can edit anything, so review the branch before you merge it.
 - Locks hash every file name, but not the content of files git ignores, so caches like `.pyc` don't trip them. Don't lock data that git ignores. Put it under `.hill-climb/<name>/`, where content is always hashed.
