@@ -1,6 +1,6 @@
 {
   "name": "hill-climb",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Give your coding agent a goal and a number. It climbs in small steps, keeps what the check proves, undoes the rest, and can't edit the check to win.",
   "author": { "name": "Bil0000", "url": "https://github.com/Bil0000" },
   "homepage": "https://github.com/Bil0000/Hill-Climb",

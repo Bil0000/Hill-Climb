@@ -82,6 +82,8 @@ The agent builds the check and climbs. For a big goal, it first shows you a one-
 
 Needs Python 3.9+ and git. Nothing else. No packages, no server, no account.
 
+**Update.** Claude Code does not update a plugin from this marketplace by itself. In your shell, run `claude plugin marketplace update hill-climb`, then `claude plugin update hill-climb@hill-climb`, then restart Claude Code. To get new versions on their own, open `/plugin`, go to **Marketplaces**, pick **hill-climb**, and select **Enable auto-update**. With the copy install, `git pull` the clone and copy `skills/hill-climb` again. A climb you started on an older version carries on after the update.
+
 ## How it works
 
 <img src="assets/how-it-works.svg" alt="How Hill Climb works: the agent writes a check that prints a number, climb.py init locks it, then each small change goes through climb.py try. A better score with passing guards is committed. Anything else is undone. It stops at the bar or when gains stop, with a report of measured numbers." width="860">
@@ -206,7 +208,7 @@ It builds a tiny shop in a temp folder, runs a full climb, and deletes it.
 python3 tests/test_hill_climb.py
 ```
 
-42 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
+44 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
 
 ## License
 
