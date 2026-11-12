@@ -414,6 +414,14 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("broke", output)
         self.assertEqual(self.card()["best"]["score"], 3)
 
+    def test_paired_check_cannot_hide_an_edit_by_staging_it(self):
+        Path("check.sh").write_text('if [ "$(cat value.txt)" = 5 ]; then echo 9 > value.txt; git add value.txt; fi\ncat value.txt\n')
+        git("commit", "-qam", "check that stages its edit")
+        self.start("--paired")
+        Path("value.txt").write_text("5\n")
+        self.assertIn("broke", self.run_climb("try", "five, which the check rewrites and stages")[1])
+        self.assertEqual(self.card()["best"]["score"], 3)
+
     def test_paired_check_output_in_a_locked_folder_does_not_trip_the_lock(self):
         Path("bench").mkdir()
         Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\ncat value.txt\n")

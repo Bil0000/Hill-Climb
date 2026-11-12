@@ -183,11 +183,14 @@ def paired(folder, card, snap):
         for side, scores in order if turn % 2 == 0 else order[::-1]:
             switch_trees(side)
             score, _, took = measure(card["check"], 1, card["timeout"], folder / "last.txt" if side is trees else None, card["score"])
-            live = dict.fromkeys(trees, (None, None))
-            edited = written(live)[0]
-            if edited:
-                raise Fail(edited_while_scoring(edited, card["lock"]))
-            drop_new(live)
+            fixed = side_index(side)
+            try:
+                edited = written(fixed)[0]
+                if edited:
+                    raise Fail(edited_while_scoring(edited, card["lock"]))
+                drop_new(fixed)
+            finally:
+                forget(fixed)
             if card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]:
                 raise Fail("the check changed a locked file")
             scores.append(score)
@@ -330,6 +333,16 @@ def snapshot(roots):
             git("read-tree", "HEAD", cwd=path, index=index)
         git("add", "-A", cwd=path, index=index)
         trees[str(path)] = (git("write-tree", cwd=path, index=index), index)
+    return trees
+
+
+def side_index(side):
+    trees = {}
+    for path, tree in side.items():
+        index = str(Path(path) / git("rev-parse", "--git-path", "hill-climb-side.index", cwd=path))
+        git("read-tree", tree, cwd=path, index=index)
+        git("update-index", "-q", "--refresh", check=False, cwd=path, index=index)
+        trees[path] = (tree, index)
     return trees
 
 
