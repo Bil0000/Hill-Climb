@@ -330,14 +330,94 @@ class ClimbTest(unittest.TestCase):
             Path(".hill-climb/speed/data/seed.db").write_bytes(b"x" * 200)
             self.assertIn("STORAGE", self.run_climb("status")[1])
 
-    def test_init_refuses_a_big_file_the_check_creates(self):
-        Path("check.sh").write_text("head -c 200 /dev/zero > dump.bin\ncat value.txt\n")
-        git("commit", "-qam", "dumping check")
+    def test_init_refuses_a_big_file_the_agent_wrote(self):
+        Path("bench").mkdir()
+        Path("bench/check.sh").write_text("cat value.txt\n")
+        Path("bench/dump.bin").write_bytes(b"x" * 200)
         with mock.patch.object(climb, "COMMIT_LIMIT", 100):
-            code, output = self.run_climb("init", "speed", "--goal", "g", "--check", "sh check.sh", "--direction", "max")
+            code, output = self.run_climb("init", "speed", "--goal", "g", "--check", "sh bench/check.sh",
+                                          "--direction", "max", "--lock", "bench")
         self.assertEqual(code, 1)
         self.assertIn("dump.bin", output)
         self.assertEqual(subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(), "main")
+
+    def test_check_output_is_never_committed(self):
+        Path("check.sh").write_text("head -c 200 /dev/zero > dump.bin\necho run > report.txt\ncat value.txt\n")
+        git("commit", "-qam", "check that writes files")
+        with mock.patch.object(climb, "COMMIT_LIMIT", 100):
+            output = self.start()
+            self.assertIn("Not committed", output)
+            Path("value.txt").write_text("5\n")
+            code, output = self.run_climb("try", "bump to five")
+        self.assertIn("kept", output)
+        self.assertIn("dump.bin, report.txt", output)
+        committed = subprocess.check_output(["git", "log", "--format=", "--name-only", "main..HEAD"], text=True).split()
+        self.assertEqual(committed, ["value.txt"])
+        self.assertFalse(Path("dump.bin").exists())
+        self.assertEqual(subprocess.check_output(["git", "status", "--porcelain"], text=True), "")
+
+    def test_guard_that_rewrites_code_is_refused(self):
+        code, output = self.run_climb("init", "speed", "--goal", "g", "--check", "sh check.sh", "--direction", "max",
+                                      "--lock", "check.sh", "--guard", "echo 0 > value.txt")
+        self.assertEqual(code, 1)
+        self.assertIn("changed value.txt", output)
+        git("checkout", "value.txt")
+        self.start("--guard", 'if [ "$(cat value.txt)" = 5 ]; then echo 6 > value.txt; fi')
+        Path("value.txt").write_text("5\n")
+        code, output = self.run_climb("try", "five, which the guard rewrites")
+        self.assertIn("broke", output)
+        self.assertIn("changed value.txt", output)
+        self.assertEqual(Path("value.txt").read_text(), "3\n")
+        self.assertEqual(self.card()["best"]["score"], 3)
+
+    def test_scoring_leaves_the_real_index_alone(self):
+        self.start("--guard", "git diff --quiet")
+        Path("value.txt").write_text("5\n")
+        code, output = self.run_climb("try", "an unstaged edit the guard can see")
+        self.assertIn("guard failed: git diff --quiet", output)
+        self.assertEqual(subprocess.check_output(["git", "status", "--porcelain"], text=True), "")
+
+    def test_paired_check_that_rewrites_code_is_refused(self):
+        Path("check.sh").write_text('if [ "$(cat value.txt)" = 5 ]; then echo 9 > value.txt; fi\ncat value.txt\n')
+        git("commit", "-qam", "rewriting check")
+        self.start("--paired", "--runs", "2", "--guard", "git diff --cached --quiet")
+        Path("value.txt").write_text("5\n")
+        code, output = self.run_climb("try", "five, which the check rewrites")
+        self.assertIn("broke", output)
+        self.assertIn("changed value.txt", output)
+        self.assertEqual(self.card()["best"]["score"], 3)
+        Path("value.txt").write_text("4\n")
+        code, output = self.run_climb("try", "four, unstaged for the guard")
+        self.assertIn("kept", output)
+        self.assertEqual(subprocess.check_output(["git", "show", "HEAD:value.txt"], text=True), "4\n")
+
+    def test_force_added_ignored_file_is_committed(self):
+        Path(".gitignore").write_text("gen.txt\n")
+        Path("check.sh").write_text("cat gen.txt 2>/dev/null || cat value.txt\n")
+        git("add", ".")
+        git("commit", "-qm", "ignore gen")
+        self.start()
+        Path("gen.txt").write_text("6\n")
+        git("add", "-f", "gen.txt")
+        code, output = self.run_climb("try", "force-add a generated six")
+        self.assertIn("kept", output)
+        self.assertEqual(subprocess.check_output(["git", "show", "HEAD:gen.txt"], text=True), "6\n")
+
+    def test_check_output_in_a_locked_folder_does_not_trip_the_lock(self):
+        Path("bench").mkdir()
+        Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\ncat value.txt\n")
+        code, output = self.run_climb("init", "speed", "--goal", "g", "--check", "sh bench/check.sh",
+                                      "--direction", "max", "--lock", "bench")
+        self.assertEqual(code, 0, output)
+        Path("value.txt").write_text("5\n")
+        code, output = self.run_climb("try", "bump to five")
+        self.assertIn("kept", output)
+        Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\necho 1 > relock-report.txt\ncat value.txt\n")
+        code, output = self.run_climb("relock", "--why", "report too")
+        self.assertEqual(code, 0, output)
+        self.assertFalse(Path("relock-report.txt").exists())
+        Path("value.txt").write_text("7\n")
+        self.assertIn("kept", self.run_climb("try", "bump to seven")[1])
 
     def test_budget_stops_the_climb(self):
         self.start("--max-steps", "1")

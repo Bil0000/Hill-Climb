@@ -42,8 +42,9 @@ class Fail(Exception):
     pass
 
 
-def git(*args, check=True, cwd=None):
-    result = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd)
+def git(*args, check=True, cwd=None, index=None):
+    env = {**os.environ, "GIT_INDEX_FILE": index} if index else None
+    result = subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, env=env)
     if check and result.returncode:
         raise Fail(f"git {' '.join(args)} failed: {result.stderr.strip()}")
     return result.stdout.strip()
@@ -173,11 +174,8 @@ def switch_trees(trees):
         git("read-tree", "-u", "--reset", tree, cwd=path)
 
 
-def paired(folder, card):
-    trees = {}
-    for path in checkouts(card):
-        git("add", "-A", cwd=path)
-        trees[str(path)] = git("write-tree", cwd=path)
+def paired(folder, card, snap):
+    trees = {path: tree for path, (tree, _) in snap.items()}
     (folder / "pending-tree").write_text(json.dumps(trees) + "\n")
     base, new, seconds = [], [], []
     for turn in range(card["runs"] + card["runs"] % 2):
@@ -187,9 +185,14 @@ def paired(folder, card):
             score, _, took = measure(card["check"], 1, card["timeout"], folder / "last.txt" if side is trees else None, card["score"])
             if card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]:
                 raise Fail("the check changed a locked file")
+            edited = written(snap)[0] if side is trees else []
+            if edited:
+                raise Fail(edited_while_scoring(edited, card["lock"]))
             scores.append(score)
             seconds.append(took)
     switch_trees(trees)
+    for path in trees:
+        git("read-tree", "HEAD", cwd=path)
     (folder / "pending-tree").unlink()
     new, base = statistics.median(new), statistics.median(base)
     if base == 0:
@@ -313,13 +316,59 @@ def undo(card):
         git("clean", "-fdq", cwd=path)
 
 
-def commit(roots, message):
+def snapshot(roots):
+    """Record each checkout's tree before the check runs, in a private index, so the real one is untouched."""
+    trees = {}
+    for path in roots:
+        index = str(Path(path) / git("rev-parse", "--git-path", "hill-climb.index", cwd=path))
+        real = Path(path) / git("rev-parse", "--git-path", "index", cwd=path)
+        if real.is_file():
+            shutil.copy2(real, index)  # keep the mtime, or git's racy-file check misses same-second edits
+        else:
+            git("read-tree", "HEAD", cwd=path, index=index)
+        git("add", "-A", cwd=path, index=index)
+        trees[str(path)] = (git("write-tree", cwd=path, index=index), index)
+    return trees
+
+
+def written(trees):
+    """Files the check or a guard changed since the snapshot, and new files they made."""
+    root, changed, made = repo(), [], []
+    for path, (_, index) in trees.items():
+        changed += [os.path.relpath(Path(path) / name, root) for name in git("diff", "--name-only", cwd=path, index=index).splitlines()]
+        made += [os.path.relpath(Path(path) / name, root)
+                 for name in git("ls-files", "--others", "--exclude-standard", cwd=path, index=index).splitlines()]
+    return sorted(changed), sorted(made)
+
+
+def drop_new(trees):
+    for path, (_, index) in trees.items():
+        git("clean", "-fdq", cwd=path, index=index)
+
+
+def forget(trees):
+    for _, index in trees.values():
+        Path(index).unlink(missing_ok=True)
+
+
+def listed(names):
+    return ", ".join(names[:5]) + (f" and {len(names) - 5} more" if len(names) > 5 else "")
+
+
+def edited_while_scoring(changed, locks):
+    if outside(changed, locks) != changed:
+        return "the check or a guard changed a locked file"
+    return f"the check or a guard changed {listed(changed)}, so the scored code is not what would be committed"
+
+
+def commit(trees, message):
+    """Commit exactly the snapshot trees, in every checkout that changed."""
     done = []
     try:
-        for path in roots:
-            if git("status", "--porcelain", cwd=path):
+        for path, (tree, _) in trees.items():
+            if tree != git("rev-parse", "HEAD^{tree}", cwd=path):
                 head = git("rev-parse", "HEAD", cwd=path)
-                git("add", "-A", cwd=path)
+                git("read-tree", tree, cwd=path)
                 git("commit", "-q", "--no-verify", "-m", message, cwd=path)
                 done.append((path, head))
     except Fail:
@@ -472,23 +521,30 @@ def cmd_init(args):
             "Commit or set aside changes outside the locked check files first: "
             + ", ".join(stray[:5])
         )
-    folder.mkdir(parents=True, exist_ok=True)
-    score, spread, seconds = measure(args.check, args.runs, args.timeout, folder / "best.txt", args.score)
-    target = bar(args.target, score, args.direction)
-    failed = failing_guards(args.guard or [], args.timeout)
-    if failed:
-        raise Fail(f"A guard already fails before the climb starts: {failed[0]}\n{failed[1]}")
-    changed = changed_files(roots)
     big = too_big(changed)
     if big:
         raise Fail(f"A file is over {COMMIT_LIMIT // 1_000_000} MB and would be committed: {big[0]}. "
                    f"Move big data under .hill-climb/{args.name}/data/.")
+    folder.mkdir(parents=True, exist_ok=True)
+    trees = snapshot(roots)
+    try:
+        score, spread, seconds = measure(args.check, args.runs, args.timeout, folder / "best.txt", args.score)
+        target = bar(args.target, score, args.direction)
+        failed = failing_guards(args.guard or [], args.timeout)
+        if failed:
+            raise Fail(f"A guard already fails before the climb starts: {failed[0]}\n{failed[1]}")
+        edited, made = written(trees)
+        if edited:
+            raise Fail(f"Can't start: {edited_while_scoring(edited, lock)}. A check and its guards must not edit files.")
+        drop_new(trees)
+    finally:
+        forget(trees)
     locked = fingerprint(lock) if lock else None
     bases = [git("branch", "--show-current", cwd=path) for path in roots]
     if not args.here:
         for path in roots:
             git("switch", "-q", "-c", f"climb/{args.name}", cwd=path)
-    commit(roots, f"climb({args.name}): add the check")
+    commit(trees, f"climb({args.name}): add the check")
     base = bases[0]
     card = {
         "name": args.name,
@@ -528,6 +584,8 @@ def cmd_init(args):
     holdout = run_holdout(folder, card, "baseline")
     also = f" in {len(roots)} repos" if len(roots) > 1 else ""
     print(f"Climb {args.name} started on {card['branch']}{also}. Check output: {folder / 'best.txt'}")
+    if made:
+        print(f"Not committed, written by the check or a guard: {listed(made)}")
     print(save_kit(folder, card))
     print(f"Baseline {number(score)} ({args.direction}), check takes {seconds:.1f}s.")
     if holdout is not None:
@@ -587,9 +645,24 @@ def cmd_try(args):
     step = len(steps) + 1
     best = card["best"]["score"]
     row = {"kind": "step", "step": step, "idea": args.idea}
+    big = too_big(changed_files(roots))
+    if big:
+        undo(card)
+        append(folder, {**row, "result": "broke", "why": f"would commit a file over {COMMIT_LIMIT // 1_000_000} MB: {big[0]}"})
+        print(f"step {step} broke   {args.idea}\nWould commit a file over {COMMIT_LIMIT // 1_000_000} MB: {big[0]}\n"
+              f"Write big output under .hill-climb/{card['name']}/data/.\nUndone.")
+        return
+    trees = snapshot(roots)
+    try:
+        return scored_step(folder, card, args, roots, trees, step, best, row)
+    finally:
+        forget(trees)
+
+
+def scored_step(folder, card, args, roots, trees, step, best, row):
     try:
         if card.get("paired"):
-            score, row["pair"], seconds = paired(folder, card)
+            score, row["pair"], seconds = paired(folder, card, trees)
         else:
             score, _, seconds = measure(card["check"], card["runs"], card["timeout"], folder / "last.txt", card["score"])
     except Fail as error:
@@ -613,28 +686,26 @@ def cmd_try(args):
         append(folder, {**row, "result": "undone", "why": f"guard failed: {failed[0]}"})
         print(f"step {step} undone  {number(score)} but guard failed: {failed[0]}\n{failed[1]}")
         return
+    edited, made = written(trees)
+    drop_new(trees)
     try:
         moved = card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]
     except Fail:
         moved = True
-    if moved:
+    if edited or moved:
+        why = edited_while_scoring(edited, card["lock"]) if edited else "the check or a guard changed a locked file"
         undo(card)
-        append(folder, {**row, "result": "broke", "why": "the check or a guard changed a locked file"})
-        print(f"step {step} broke   {args.idea}\nThe check or a guard changed a locked file.\nUndone.")
+        append(folder, {**row, "result": "broke", "why": why})
+        print(f"step {step} broke   {args.idea}\n{why[0].upper() + why[1:]}.\nUndone.")
         return
-    big = too_big(changed_files(roots))
-    if big:
-        undo(card)
-        append(folder, {**row, "result": "broke", "why": f"would commit a file over {COMMIT_LIMIT // 1_000_000} MB: {big[0]}"})
-        print(f"step {step} broke   {args.idea}\nWould commit a file over {COMMIT_LIMIT // 1_000_000} MB: {big[0]}\n"
-              f"Write big output under .hill-climb/{card['name']}/data/.\nUndone.")
-        return
-    commit(roots, f"climb({card['name']}): step {step} {args.idea}\n\nscore {number(score)}, was {number(best)}")
+    commit(trees, f"climb({card['name']}): step {step} {args.idea}\n\nscore {number(score)}, was {number(best)}")
     keep_output(folder)
     card["best"] = {"score": score, "commit": git("rev-parse", "HEAD"), "step": step}
     save(folder, card)
     append(folder, {**row, "result": "kept", "gain": better(card, score, best)})
     print(f"step {step} kept    {number(score)} (was {number(best)}, start {number(card['baseline'])})  {args.idea}")
+    if made:
+        print(f"Not committed, written by the check or a guard: {listed(made)}")
     if reached(card, score):
         holdout = run_holdout(folder, card, "bar reached")
         print(f"BAR REACHED: {number(score)} meets {number(card['target'])}. The card says: {card['after']}.")
@@ -733,12 +804,20 @@ def cmd_relock(args):
     stray = outside(changed_files(checkouts(card)), card["lock"])
     if stray:
         raise Fail("Relock changes only the locked check files. Undo or try these first: " + ", ".join(stray[:5]))
-    failed = failing_guards(card["guards"], card["timeout"])
-    if failed:
-        raise Fail(f"A guard fails with the changed check: {failed[0]}\n{failed[1]}")
-    commit(checkouts(card), f"climb({card['name']}): fix the check\n\n{args.why}")
-    score, _, _ = measure(card["check"], card["runs"], card["timeout"], folder / "best.txt", card["score"])
+    trees = snapshot(checkouts(card))
+    try:
+        failed = failing_guards(card["guards"], card["timeout"])
+        if failed:
+            raise Fail(f"A guard fails with the changed check: {failed[0]}\n{failed[1]}")
+        score, _, _ = measure(card["check"], card["runs"], card["timeout"], folder / "best.txt", card["score"])
+        edited, made = written(trees)
+        if edited:
+            raise Fail(f"Not relocked: {edited_while_scoring(edited, card['lock'])}.")
+        drop_new(trees)
+    finally:
+        forget(trees)
     card["fingerprint"] = fingerprint(card["lock"])
+    commit(trees, f"climb({card['name']}): fix the check\n\n{args.why}")
     card["best"] = {"score": score, "commit": git("rev-parse", "HEAD"), "step": len([r for r in rows(folder) if r["kind"] == "step"])}
     save(folder, card)
     append(folder, {"kind": "relock", "why": args.why, "score": score})

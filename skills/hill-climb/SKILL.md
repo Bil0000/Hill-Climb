@@ -247,7 +247,9 @@ those files again. If the visible score goes up and the holdout doesn't, the
 climb is overfitting. Stop and say so.
 
 Lock the check, the guards, the tests, the fixtures, and the holdout with
-`--lock`. The script refuses to score while a locked file changed. New check
+`--lock`. Lock the test runner's config too (`vitest.config.*`, `jest.config.*`,
+`pytest.ini`, `pyproject.toml`), or a step can pass by running fewer tests.
+The script refuses to score while a locked file changed. New check
 files under a `--lock` path become the first commit on the climb branch.
 Anything else uncommitted stops init.
 
@@ -341,6 +343,9 @@ Each step is one idea, one change, one `try`:
    idea, like `"cache the parser (expect -10%)"`. When a guess is far off,
    your model of the code is wrong: profile before the next step.
 3. `python3 "$CLIMB" try "<idea>"`. It commits a win or resets the tree.
+   It commits exactly the code it scored. A check or guard that edits a
+   file breaks the step, so guard with `prettier --check`, not `--write`.
+   New files they write, like reports, are never committed.
    Either way, move on. The full check output of the step is in
    `.hill-climb/<name>/last.txt`, and of the best step in `best.txt`. Read
    it there instead of running the check again.
