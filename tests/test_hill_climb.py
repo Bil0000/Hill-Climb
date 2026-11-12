@@ -391,6 +391,38 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("kept", output)
         self.assertEqual(subprocess.check_output(["git", "show", "HEAD:value.txt"], text=True), "4\n")
 
+    def test_check_that_drops_an_ignore_rule_keeps_ignored_files(self):
+        Path(".gitignore").write_text("secret.txt\n")
+        Path("check.sh").write_text('[ "$(cat value.txt)" = 5 ] && : > .gitignore\ncat value.txt\n')
+        git("add", ".")
+        git("commit", "-qm", "ignore secret")
+        self.start()
+        Path("secret.txt").write_text("mine\n")
+        Path("value.txt").write_text("5\n")
+        self.assertIn("broke", self.run_climb("try", "five, which empties the ignore file")[1])
+        self.assertEqual(Path("secret.txt").read_text(), "mine\n")
+
+    def test_paired_check_that_rewrites_the_old_code_is_refused(self):
+        Path(".gitignore").write_text("armed\n")
+        Path("check.sh").write_text('[ -f armed ] && [ "$(cat value.txt)" = 3 ] && echo 1 > value.txt\ncat value.txt\n')
+        git("add", ".")
+        git("commit", "-qm", "check that rewrites the old side")
+        self.start("--paired")
+        Path("armed").write_text("")
+        Path("value.txt").write_text("2\n")
+        output = self.run_climb("try", "two, worse than three")[1]
+        self.assertIn("broke", output)
+        self.assertEqual(self.card()["best"]["score"], 3)
+
+    def test_paired_check_output_in_a_locked_folder_does_not_trip_the_lock(self):
+        Path("bench").mkdir()
+        Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\ncat value.txt\n")
+        code, output = self.run_climb("init", "speed", "--goal", "g", "--check", "sh bench/check.sh",
+                                      "--direction", "max", "--lock", "bench", "--paired")
+        self.assertEqual(code, 0, output)
+        Path("value.txt").write_text("5\n")
+        self.assertIn("kept", self.run_climb("try", "bump to five")[1])
+
     def test_force_added_ignored_file_is_committed(self):
         Path(".gitignore").write_text("gen.txt\n")
         Path("check.sh").write_text("cat gen.txt 2>/dev/null || cat value.txt\n")

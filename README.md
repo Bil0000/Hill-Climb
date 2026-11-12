@@ -206,7 +206,7 @@ It builds a tiny shop in a temp folder, runs a full climb, and deletes it.
 python3 tests/test_hill_climb.py
 ```
 
-37 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
+40 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
 
 ## License
 

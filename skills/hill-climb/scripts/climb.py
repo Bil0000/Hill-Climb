@@ -183,11 +183,13 @@ def paired(folder, card, snap):
         for side, scores in order if turn % 2 == 0 else order[::-1]:
             switch_trees(side)
             score, _, took = measure(card["check"], 1, card["timeout"], folder / "last.txt" if side is trees else None, card["score"])
-            if card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]:
-                raise Fail("the check changed a locked file")
-            edited = written(snap)[0] if side is trees else []
+            live = dict.fromkeys(trees, (None, None))
+            edited = written(live)[0]
             if edited:
                 raise Fail(edited_while_scoring(edited, card["lock"]))
+            drop_new(live)
+            if card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]:
+                raise Fail("the check changed a locked file")
             scores.append(score)
             seconds.append(took)
     switch_trees(trees)
@@ -687,13 +689,15 @@ def scored_step(folder, card, args, roots, trees, step, best, row):
         print(f"step {step} undone  {number(score)} but guard failed: {failed[0]}\n{failed[1]}")
         return
     edited, made = written(trees)
-    drop_new(trees)
-    try:
-        moved = card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]
-    except Fail:
-        moved = True
-    if edited or moved:
-        why = edited_while_scoring(edited, card["lock"]) if edited else "the check or a guard changed a locked file"
+    why = edited_while_scoring(edited, card["lock"]) if edited else None
+    if not why:
+        drop_new(trees)
+        try:
+            if card["lock"] and fingerprint(card["lock"]) != card["fingerprint"]:
+                why = "the check or a guard changed a locked file"
+        except Fail:
+            why = "the check or a guard changed a locked file"
+    if why:
         undo(card)
         append(folder, {**row, "result": "broke", "why": why})
         print(f"step {step} broke   {args.idea}\n{why[0].upper() + why[1:]}.\nUndone.")
