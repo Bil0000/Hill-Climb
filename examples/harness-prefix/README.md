@@ -84,7 +84,9 @@ tokens they saved, so read them before you trim a prompt.
 The same finding, from the harness side: headings are the cheapest thing in a
 prompt. In nodecode the manual index is 16 lines of `:topic - subtitle`; the
 topic name alone resolves every lookup. Cutting the subtitles to a short label
-is worth about 25 tokens per request, every request, forever. A knob such as
+is worth about 30 tokens per request, every request, forever. A knob such as
 `help.headings = full | short | off` would let a user choose that in one line.
 
-See the field report in issue #5.
+Two upstream PRs came out of this climb: nodecode-ai/nodecode#470 (the core
+topics and the image line) and nodecode-ai/cells#129 (five cell topics).
+Together they are about 480 tokens per request, for every user of the build.
