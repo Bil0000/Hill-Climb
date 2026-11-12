@@ -45,7 +45,7 @@ That one command does all of this:
 1. Checks that no locked file changed (the tests, the benchmark, the fixtures). If one did, it refuses.
 2. Runs your check, all of your checks in parallel, and reads the score.
 3. Runs your guards: the old tests, typecheck, lint. All must still pass.
-4. **Better and safe?** It commits the step, in every repo the climb touches.
+4. **Better and safe?** It commits the step, in every repo the climb touches. It commits exactly the code that was scored.
 5. **Worse, equal, or a guard failed?** It resets the tree, in every repo. The bad idea never lands.
 6. Writes the step to a log on disk, with the full output in `last.txt`.
 
@@ -185,6 +185,7 @@ The full guide for the agent is [`skills/hill-climb/SKILL.md`](skills/hill-climb
 - `drop` goes back to your branch and keeps the old climb on a renamed branch.
 - Only one command that changes a climb runs at a time in a checkout. An interrupted command that is still running blocks the next one, so two runs never score at once.
 - `init` and `try` refuse to commit a file over 10 MB.
+- A kept step is exactly the code that was scored. If the check or a guard edits a file, like `prettier --write`, the step is refused. New files they write, like reports, are never committed, and deleted unless git ignores them.
 - The lock catches mistakes, not a determined cheat. An agent with a shell can edit anything, so review the branch before you merge it.
 - Locks hash every file name, but not the content of files git ignores, so caches like `.pyc` don't trip them. Don't lock data that git ignores. Put it under `.hill-climb/<name>/`, where content is always hashed.
 - `judge.py` tells each judge to ignore instructions inside the work it scores. A model judge can still be fooled. Prefer an exact check when one exists.
@@ -205,7 +206,7 @@ It builds a tiny shop in a temp folder, runs a full climb, and deletes it.
 python3 tests/test_hill_climb.py
 ```
 
-31 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
+42 tests. They run real git repos in temp folders and cover multi-repo commits, rollback, locks, guards, paired timing, holdouts, and kits.
 
 ## License
 
