@@ -422,6 +422,19 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("broke", self.run_climb("try", "five, which the check rewrites and stages")[1])
         self.assertEqual(self.card()["best"]["score"], 3)
 
+    def test_paired_check_cannot_hide_an_edit_by_committing_it(self):
+        Path(".gitignore").write_text("armed\n")
+        Path("check.sh").write_text('[ -f armed ] && [ "$(cat value.txt)" = 3 ] && echo 1 > value.txt && git commit -qam hide\ncat value.txt\n')
+        git("add", ".")
+        git("commit", "-qm", "check that commits on the old side")
+        self.start("--paired")
+        Path("armed").write_text("")
+        Path("value.txt").write_text("2\n")
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True)
+        self.assertIn("broke", self.run_climb("try", "two, worse than three")[1])
+        self.assertEqual(self.card()["best"]["score"], 3)
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], text=True), head)
+
     def test_paired_check_output_in_a_locked_folder_does_not_trip_the_lock(self):
         Path("bench").mkdir()
         Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\ncat value.txt\n")

@@ -177,12 +177,18 @@ def switch_trees(trees):
 def paired(folder, card, snap):
     trees = {path: tree for path, (tree, _) in snap.items()}
     (folder / "pending-tree").write_text(json.dumps(trees) + "\n")
+    heads = {path: git("rev-parse", "HEAD", cwd=path) for path in trees}
+    old = {path: git("rev-parse", "HEAD^{tree}", cwd=path) for path in trees}
     base, new, seconds = [], [], []
     for turn in range(card["runs"] + card["runs"] % 2):
-        order = [(trees, new), (dict.fromkeys(trees, "HEAD"), base)]
+        order = [(trees, new), (old, base)]
         for side, scores in order if turn % 2 == 0 else order[::-1]:
             switch_trees(side)
             score, _, took = measure(card["check"], 1, card["timeout"], folder / "last.txt" if side is trees else None, card["score"])
+            if any(git("rev-parse", "HEAD", cwd=path) != head for path, head in heads.items()):
+                for path, head in heads.items():
+                    git("reset", "--hard", "-q", head, cwd=path)
+                raise Fail("the check moved HEAD")
             fixed = side_index(side)
             try:
                 edited = written(fixed)[0]
