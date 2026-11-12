@@ -174,10 +174,21 @@ def switch_trees(trees):
         git("read-tree", "-u", "--reset", tree, cwd=path)
 
 
+def head_of(path):
+    return git("symbolic-ref", "-q", "--short", "HEAD", check=False, cwd=path), git("rev-parse", "HEAD", cwd=path)
+
+
+def put_back(pins):
+    moved = [path for path, at in pins.items() if head_of(path) != at]
+    for path in moved:
+        branch, head = pins[path]
+        git("switch", "-f", "-q", *(["-C", branch] if branch else ["--detach"]), head, cwd=path)
+    return bool(moved)
+
+
 def paired(folder, card, snap):
     trees = {path: tree for path, (tree, _) in snap.items()}
     (folder / "pending-tree").write_text(json.dumps(trees) + "\n")
-    heads = {path: git("rev-parse", "HEAD", cwd=path) for path in trees}
     old = {path: git("rev-parse", "HEAD^{tree}", cwd=path) for path in trees}
     base, new, seconds = [], [], []
     for turn in range(card["runs"] + card["runs"] % 2):
@@ -185,10 +196,6 @@ def paired(folder, card, snap):
         for side, scores in order if turn % 2 == 0 else order[::-1]:
             switch_trees(side)
             score, _, took = measure(card["check"], 1, card["timeout"], folder / "last.txt" if side is trees else None, card["score"])
-            if any(git("rev-parse", "HEAD", cwd=path) != head for path, head in heads.items()):
-                for path, head in heads.items():
-                    git("reset", "--hard", "-q", head, cwd=path)
-                raise Fail("the check moved HEAD")
             fixed = side_index(side)
             try:
                 edited = written(fixed)[0]
@@ -681,11 +688,16 @@ def cmd_try(args):
 
 
 def scored_step(folder, card, args, roots, trees, step, best, row):
+    pins = {path: head_of(path) for path in trees}
     try:
-        if card.get("paired"):
-            score, row["pair"], seconds = paired(folder, card, trees)
-        else:
-            score, _, seconds = measure(card["check"], card["runs"], card["timeout"], folder / "last.txt", card["score"])
+        try:
+            if card.get("paired"):
+                score, row["pair"], seconds = paired(folder, card, trees)
+            else:
+                score, _, seconds = measure(card["check"], card["runs"], card["timeout"], folder / "last.txt", card["score"])
+        finally:
+            if put_back(pins):
+                raise Fail("the check moved HEAD")
     except Fail as error:
         undo(card)
         (folder / "pending-tree").unlink(missing_ok=True)
@@ -702,6 +714,8 @@ def scored_step(folder, card, args, roots, trees, step, best, row):
         print(f"step {step} undone  {number(score)} (best {number(best)})  {args.idea}\nOutput: {folder / 'last.txt'}")
         return
     failed = failing_guards(card["guards"], card["timeout"])
+    if put_back(pins):
+        failed = ("a guard moved HEAD", "")
     if failed:
         undo(card)
         append(folder, {**row, "result": "undone", "why": f"guard failed: {failed[0]}"})

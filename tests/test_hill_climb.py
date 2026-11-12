@@ -435,6 +435,25 @@ class ClimbTest(unittest.TestCase):
         self.assertEqual(self.card()["best"]["score"], 3)
         self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], text=True), head)
 
+    def test_paired_check_that_commits_on_another_branch_and_fails_keeps_that_branch(self):
+        Path("check.sh").write_text('[ "$(cat value.txt)" = 2 ] && git switch -qc personal && git commit -qam mine && exit 1\ncat value.txt\n')
+        git("commit", "-qam", "check that leaves the climb branch")
+        self.start("--paired")
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True)
+        Path("value.txt").write_text("2\n")
+        self.assertIn("broke", self.run_climb("try", "two")[1])
+        self.assertEqual(subprocess.check_output(["git", "branch", "--show-current"], text=True).strip(), "climb/speed")
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], text=True), head)
+        self.assertEqual(subprocess.check_output(["git", "log", "-1", "--format=%s", "personal"], text=True).strip(), "mine")
+
+    def test_guard_that_commits_is_undone(self):
+        self.start("--guard", 'git commit -qam guard || true')
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True)
+        Path("value.txt").write_text("5\n")
+        self.assertIn("a guard moved HEAD", self.run_climb("try", "five")[1])
+        self.assertEqual(subprocess.check_output(["git", "rev-parse", "HEAD"], text=True), head)
+        self.assertEqual(Path("value.txt").read_text(), "3\n")
+
     def test_paired_check_output_in_a_locked_folder_does_not_trip_the_lock(self):
         Path("bench").mkdir()
         Path("bench/check.sh").write_text("date +%s%N > bench/last-run.txt\ncat value.txt\n")
