@@ -391,6 +391,21 @@ class ClimbTest(unittest.TestCase):
         self.assertIn("kept", output)
         self.assertEqual(subprocess.check_output(["git", "show", "HEAD:value.txt"], text=True), "4\n")
 
+    def test_paired_sides_share_a_seed_so_random_input_scores_the_real_gain(self):
+        # The work drawn per run varies 1000x. Only a shared seed makes the paired ratio exactly 6/3.
+        Path("check.sh").write_text(
+            "python3 -c \"import os, random; n = random.Random(os.environ.get('HILL_CLIMB_SEED')).randint(1, 1000); "
+            "print(n * int(open('value.txt').read()))\"\n"
+        )
+        git("commit", "-qam", "random-size check")
+        self.start("--paired", "--runs", "3", "--target", "1e9", "--guard", 'test -z "$HILL_CLIMB_SEED"')
+        baseline = self.card()["best"]["score"]
+        Path("value.txt").write_text("6\n")
+        code, output = self.run_climb("try", "double")
+        self.assertIn("kept", output)
+        self.assertEqual(self.card()["best"]["score"], baseline * 2)
+        self.assertNotIn("HILL_CLIMB_SEED", os.environ)
+
     def test_check_that_drops_an_ignore_rule_keeps_ignored_files(self):
         Path(".gitignore").write_text("secret.txt\n")
         Path("check.sh").write_text('[ "$(cat value.txt)" = 5 ] && : > .gitignore\ncat value.txt\n')

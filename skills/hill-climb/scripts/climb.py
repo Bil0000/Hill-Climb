@@ -192,6 +192,8 @@ def paired(folder, card, snap):
     old = {path: git("rev-parse", "HEAD^{tree}", cwd=path) for path in trees}
     base, new, seconds = [], [], []
     for turn in range(card["runs"] + card["runs"] % 2):
+        # Both sides of a turn get the same seed, so a check that draws random input times the same work.
+        os.environ["HILL_CLIMB_SEED"] = str(int.from_bytes(os.urandom(4), "big"))
         order = [(trees, new), (old, base)]
         for side, scores in order if turn % 2 == 0 else order[::-1]:
             switch_trees(side)
@@ -208,6 +210,7 @@ def paired(folder, card, snap):
                 raise Fail("the check changed a locked file")
             scores.append(score)
             seconds.append(took)
+    os.environ.pop("HILL_CLIMB_SEED", None)
     switch_trees(trees)
     for path in trees:
         git("read-tree", "HEAD", cwd=path)
@@ -631,7 +634,8 @@ def cmd_init(args):
             f"Warning: the score moved {number(spread)} ({percent:.1f}%) between runs with no code change. "
             f"Set --min-gain above that, or a lucky run will count as a win. A percent like "
             f"--min-gain {max(1, round(percent * 1.5))}% keeps working as the score shrinks. "
-            f"If the machine's load changes the score, add --paired."
+            + ("If the check draws random input, seed it from HILL_CLIMB_SEED, so both sides of a pair time the same work."
+               if args.paired else "If the machine's load changes the score, add --paired.")
         )
     if not args.guard:
         risk = ("A crash that stops the tests can print fewer failures and win." if args.score and args.direction == "min"
@@ -962,7 +966,10 @@ def cmd_reuse(args):
 
 
 def cmd_list(args):
-    for path in sorted(climbs_dir().glob("*/card.json")):
+    cards = sorted(climbs_dir().glob("*/card.json"))
+    if not cards:
+        print("No climbs in this repo.")
+    for path in cards:
         card = json.loads(path.read_text())
         print(f"{card['name']:<20} {card['branch']:<28} {number(card['baseline'])} -> {number(card['best']['score'])}  {card['goal']}")
 
