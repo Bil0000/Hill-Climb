@@ -98,7 +98,15 @@ Keep each step's check to the affected tests, and the full suites as guards.
   can't be memorized. Check the result against the reference in the same run.
 - Init with `--runs 3` or more. The script discards one warm-up run and takes
   the median. Set `--min-gain` above the spread init reports.
-- On a shared machine, add `--paired`.
+- On a shared machine, add `--paired`. Each turn of a paired step sets
+  `HILL_CLIMB_SEED`, the same for the old and the new code. Seed random
+  input from it, or each side times different work and the score drifts
+  far from the real gain:
+  `random.seed(os.environ.get("HILL_CLIMB_SEED"))`. Unset, it falls back
+  to a fresh seed, so plain runs still vary. Randomize the content, not the
+  size: when the seed also picks how much work a run does (row counts, key
+  counts), a step's real gain changes with every seed and the score swings
+  with it.
 - Always add the correctness check as a guard. A faster wrong answer is a loss.
 
 ```sh

@@ -42,7 +42,9 @@ fit, as shown in step 2.
    - Faster or smaller: a script that times or counts the work on fresh
      random input. Copy the old code as the reference, and add a guard that
      compares the new output with it. Score with `--direction min --target
-     <N>x --runs 3`, and add `--paired` when it is a timer.
+     <N>x --runs 3`, and add `--paired` when it is a timer. A paired timer
+     must seed its random input from `HILL_CLIMB_SEED` when it is set, so
+     old and new code time the same work.
    - Anything else: whatever prints how close you are as a number.
 2. `init <name> --goal "..." --check "<command>" --lock <check files>`.
    `init` commits the new check files as the first step on the climb
@@ -334,7 +336,7 @@ check. Put it under "Next climb" in the report. Don't start it without a "go".
 
 ## 6. Reaching the bar
 
-When `try` prints BAR REACHED, the script runs the holdout. A visible win
+When `try` prints BAR REACHED, the script runs the holdout, if the climb has one. A visible win
 with a flat holdout is not a win.
 
 For `raise`, check the floor from your last profile, then set a harder bar
