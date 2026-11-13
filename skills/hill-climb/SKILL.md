@@ -131,40 +131,11 @@ check stays small.
 
 ## Helpers
 
-If the harness can start subagents, use them to work in parallel. Pick each
-helper's model by the job, from the models the harness offers. Don't
-hard-code a name:
-
-| Tier | Example | Use it for |
-| --- | --- | --- |
-| Fast | the cheapest model, like a Haiku or mini class | Reading code, finding harnesses, summarizing logs |
-| Mid | a Sonnet class model | Proposing next ideas from the profile and the log |
-| Frontier | the strongest model, like an Opus class | The blocker review and the final review |
-
-- **Only you write in the climb tree.** `try` resets it, so a helper that
-  edits it loses its work. A helper may read, or draft a fix in its own
-  worktree and return a patch. You apply the patch and run `try`.
-- **Run them in the background** while a check runs or setup installs. Don't
-  wait on a helper when you have other work.
-- **Brief them tight:** the goal, the files, and the answer shape, like
-  "up to 5 ideas, each with file:line and an expected gain, under 200 words".
-  Ask for conclusions, not file dumps.
-- **Use as many as help.** Start one per independent question, all at once.
-  Use the cheapest tier that can answer it. Don't start a helper for
-  something two of your own tool calls can do.
-- No subagents in this harness: do the same work inline.
-
-Good moments for helpers:
-
-- **Setup:** fast explorers map the code path, the tests, and any harness
-  while you start the install.
-- **Each long check:** mid helpers read the log, `notes.md`, and the profile,
-  each from a different angle, and return the next ideas ranked by expected
-  gain.
-- **PLATEAU:** frontier helpers do the blocker review with a fresh view.
-- **Before the report:** frontier helpers review the whole branch diff, for
-  example one for correctness and one for what the change could break (see
-  "Keep everything working").
+If the harness can start subagents, read `references/helpers.md` once
+before setup: which model tier fits which job, and when to start them. The
+rule that matters most: only you write in the climb tree. `try` resets it,
+so a helper that edits it loses its work. Without subagents, do the same
+work inline.
 
 ## 2. Build the check
 
@@ -183,16 +154,7 @@ that command print a number. Use the strongest form that fits:
 3. **A clock:** only when no count fits. Use `--runs` and `--paired`.
 4. **A judge:** `scripts/judge.py` with a rubric, when only taste can tell.
 
-Examples, not a closed list. Recipes are in `references/checks.md`:
-
-| Goal | Score |
-| --- | --- |
-| Port or clone a tool | Outputs that match the real tool |
-| Bug or feature | Failing tests written from the spec, not from your fix |
-| Audit, stabilize, "make X work" | Failing tests, one per finding. Add a test for each new finding and `relock` |
-| Speed or size | A count of the work behind the time |
-| Several goals at once | Progress toward the worst bar |
-| Look, feel, writing, API shape | `judge.py` with a rubric and good examples |
+Recipes for each kind are in `references/checks.md`.
 
 Use what the repo already has. `--score '<regex>'` reads the score from
 any test runner's output, so you need no wrapper script. It reads the last
@@ -255,69 +217,18 @@ Anything else uncommitted stops init.
 
 ## 3. The card
 
-Send me one message with the card filled in and nothing else to decide. Send
-it as Markdown, not in a code block, so it renders. Use this layout:
+For a big goal, send me one message, the card, and wait for **go**. Its
+layout, and two full `init` examples (one timer, one audit across two
+repos), are in `references/card.md`. Read it before you write the card.
 
-> ### Climb card: `build-speed`
-> **Goal:** cold build of the app 2x faster, same output
->
-> | Score | Now | Bar |
-> | --- | --- | --- |
-> | Median build seconds, lower is better | **47.0s** | **23.5s** (2x) |
->
-> | Setting | Recommended | Default | Why |
-> | --- | --- | --- | --- |
-> | Check | `./scripts/bench-build.sh` | none | Builds from clean, prints seconds |
-> | Kit | new | none | No saved kit fits |
-> | Runs per score | **3** | 1 | Score drifts 1.2s between runs |
-> | Paired | **yes** | no | Shared machine, so old and new run in turns |
-> | Min gain | **3%** | 0 | Above the drift, so luck can't win |
-> | Guards | `npm test`, `npm run typecheck` | none | Faster must still be correct |
-> | Holdout | 3 of the 12 sample apps | none | Catches overfitting |
-> | Locked | `scripts/bench-build.sh`, `test/`, `samples/` | none | So no step can edit the check |
-> | Timeout | 1800s | 1800s | |
-> | Budget | no limit | no limit | About 2 min a step, so 40 steps is about 1.5 hours |
-> | After the bar | **stop** | stop | |
-> | Branch | `climb/build-speed` | `climb/<name>` | One commit per kept step |
->
-> **Needs your answer:** none
->
-> Reply **go** to start, or change a line, like "runs 5".
+Skip the card for a small goal. Skip it also when I approved ahead, like
+"yolo" or "full send": put it at the top of the report and start at once.
+"go" approves the card, the branch, and the commits on it. Ask for it with
+the question tool. After that, do not ask me anything you can find out or
+decide yourself.
 
-Bold a recommendation that differs from the default. Keep each "Why" to a few
-words, and leave it empty when the default is fine. Fill every line with your
-best guess. List a line under "Needs your answer" only when I must confirm it.
-If I named a goal but no bar, propose one that is ambitious and checkable,
-like "2x faster" or "every sample matches".
-
-My reply "go" approves the card, the branch, and the commits on it. Ask for
-it with the question tool. If I already approved ahead, like "yolo" or "full
-send", don't send the card. Put it at the top of the report, and start at
-once. After that, do not ask me anything you
-can find out or decide yourself.
-
-If I have no single goal, don't invent one. Ask what I wish existed, and offer
-the most tedious useful task you can see in the repo.
-
-Then start it:
-
-```
-python3 "$CLIMB" init build-speed --goal "cold build 2x faster" \
-  --check ./scripts/bench-build.sh --direction min --target 2x --after stop \
-  --runs 3 --paired --min-gain 3% --guard "npm test" --guard "npm run typecheck" \
-  --holdout ./scripts/bench-holdout.sh --lock scripts --lock test \
-  --lock .hill-climb/build-speed/holdout
-```
-
-An audit over a backend and a frontend looks like this:
-
-```
-python3 "$CLIMB" init billing-audit --goal "every billing finding fixed" \
-  --check "pytest tests/billing -q" --check "cd ../web && npx vitest run billing" \
-  --score '(\d+) failed' --direction min --target 0 --repo ../web \
-  --guard "cd ../web && npx tsc --noEmit" \
-  --lock tests/billing --lock ../web/src/billing/__tests__
-```
+If I have no single goal, don't invent one. Ask what I wish existed, and
+offer the most tedious useful task you can see in the repo.
 
 Set `--max-hours` or `--max-steps` only when I name a limit. Without one,
 the climb runs until the bar is met or `status` says STUCK, so a quick
@@ -478,21 +389,10 @@ and notes.
 
 ## Storage
 
-Keep the footprint small, even after thousands of climbs. The script enforces
-most of this:
-
-- **Commits:** `try` and `init` refuse any file over 10 MB, so the climb
-  branch never carries big binaries.
-- **Climb state:** `status` prints STORAGE when `.hill-climb/` passes 200 MB.
-  Shrink or delete `.hill-climb/<name>/data/` before the next step.
-- **Kits:** one `.tar.gz` per climb under `~/.hill-climb/kits/<repo>/`, with
-  only the locked check files and the notes. `save` skips files over 500 KB
-  and the `data/` folder, and refuses a kit over 2 MB. A rerun overwrites the
-  old kit.
-- **Judges:** `judge.py` saves no session history. Overwrite screenshots each
-  step. Don't keep one per step.
-- **Your part:** keep notes short, reuse the existing dependency install
-  instead of copying it, and delete `data/` before the report.
+The script caps what it commits and saves, and `status` prints STORAGE
+when `.hill-climb/` passes 200 MB. Your part: keep notes short, overwrite
+screenshots instead of keeping one per step, reuse the existing dependency
+install, and delete `.hill-climb/<name>/data/` before the report.
 
 ## Starting over
 
